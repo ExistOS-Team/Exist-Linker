@@ -23,11 +23,13 @@
 #define LD_MODE_ELF_TO_EXP 0
 #define LD_MODE_REDIR__EXP 1
 
-#define PAGE_SIZE (4096)
+#define PAGE_SIZE (1024)
 
 char path_appelf[512];
 char path_syself[512];
 char path_exp[512];
+
+char *sysbuild_date;
 
 char ld_mode = LD_MODE_ELF_TO_EXP;
 
@@ -314,6 +316,13 @@ int main(int argc, const char *argv[])
                 printf("sys_symstr:%08x\n", sys_symstr);
                 sys_symstr += (uint32_t)buf_syself;
             }
+            if (strcmp(sname, ".sysinfo") == 0)
+            {
+                sysbuild_date = (char *)elf_getSectionOffset(&elf_sys, i);
+                printf("sysinfo:%08x\n", sysbuild_date);
+                sysbuild_date += (uint32_t)buf_syself;
+                printf("sysbuid date:%s\n", sysbuild_date);
+            }
         }
         syssym_hash = calc_sys_sym_hash();
         printf("sys hash:%08x\n", syssym_hash);
@@ -415,7 +424,7 @@ int main(int argc, const char *argv[])
                     {
                         *fill_addr = sym->st_value;
 
-                        printf("GLOB_DAT, at:%08x, link_addr-app:%08x -> app:%08x, sym: %s \n", rel_d[i].r_offset, sym->st_value, *fill_addr, &dynstr[sym->st_name]);
+                        //printf("GLOB_DAT, at:%08x, link_addr-app:%08x -> app:%08x, sym: %s \n", rel_d[i].r_offset, sym->st_value, *fill_addr, &dynstr[sym->st_name]);
                     }
                 }
             }
@@ -465,7 +474,7 @@ int main(int argc, const char *argv[])
                     {
                         *fill_addr = sym->st_value;
 
-                        printf("ABS32   , at:%08x, link_addr-app:%08x -> app:%08x, sym: %s \n", rel_d[i].r_offset, sym->st_value, *fill_addr, &dynstr[sym->st_name]);
+                        //printf("ABS32   , at:%08x, link_addr-app:%08x -> app:%08x, sym: %s \n", rel_d[i].r_offset, sym->st_value, *fill_addr, &dynstr[sym->st_name]);
                     }
                 }
             }
@@ -515,7 +524,7 @@ int main(int argc, const char *argv[])
                     {
                         *fill_addr = sym->st_value;
 
-                        printf("R_ARM_JUMP_SLOT, at:%08x, link_addr-app:%08x -> app:%08x, sym: %s \n", rel_d[i].r_offset, sym->st_value, *fill_addr, &dynstr[sym->st_name]);
+                        //printf("R_ARM_JUMP_SLOT, at:%08x, link_addr-app:%08x -> app:%08x, sym: %s \n", rel_d[i].r_offset, sym->st_value, *fill_addr, &dynstr[sym->st_name]);
                     }
                 }
             }
@@ -581,7 +590,7 @@ int main(int argc, const char *argv[])
                     else
                     {
                         *fill_addr = sym->st_value;
-                        printf("R_ARM_JUMP_SLOT, at:%08x, link_addr-app:%08x -> app:%08x, sym: %s \n", rel_d[i].r_offset, sym->st_value, *fill_addr, &dynstr[sym->st_name]);
+                        //printf("R_ARM_JUMP_SLOT, at:%08x, link_addr-app:%08x -> app:%08x, sym: %s \n", rel_d[i].r_offset, sym->st_value, *fill_addr, &dynstr[sym->st_name]);
                     }
                 }
             }
@@ -633,6 +642,8 @@ int main(int argc, const char *argv[])
         memcpy(&buf_exp[expHeader->reloc_fo], buf_rec_table, sz_rel);
         memcpy(&buf_exp[expHeader->data_fo], buf_data, sz_data);
         memcpy(&buf_exp[expHeader->text_fo], buf_text_rodata, sz_text);
+
+        strcpy(&expHeader->sys_build_date[0], sysbuild_date);
 
         fwrite(buf_exp, 1, sz_exp, f_exp);
 

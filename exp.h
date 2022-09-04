@@ -13,7 +13,7 @@ typedef struct exp_header_t
     uint32_t sys_hash;
 
     uint32_t entry;
-    
+
     uint32_t reloc_load_addr;
     uint32_t data_load_addr;
     uint32_t text_load_addr;
@@ -25,6 +25,11 @@ typedef struct exp_header_t
     uint32_t reloc_sz;
     uint32_t data_sz;
     uint32_t text_sz;
+
+    uint32_t dynsym_of;
+    uint32_t dynstr_of;
+
+    char sys_build_date[32];
 
 }exp_header_t;
 

@@ -5,7 +5,7 @@ project(eld VERSION 0.1.0)
 
 
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 11) 
 SET(BUILD_SHARED_LIBRARIES OFF)
 
 
@@ -18,7 +18,7 @@ add_subdirectory(libelf)
 
 add_executable(eld ${EXE_SRCS})
  
-SET_TARGET_PROPERTIES(eld PROPERTIES COMPILE_FLAGS "-O3") 
+SET_TARGET_PROPERTIES(eld PROPERTIES COMPILE_FLAGS "-O3 -Wall") 
 
 
 target_link_libraries(eld -lm -lgcc -lstdc++

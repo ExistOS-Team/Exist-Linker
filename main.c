@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <assert.h>
 #include "libelf/elf_user.h"
 #include "libelf/elf32.h"
@@ -308,10 +309,9 @@ int main(int argc, const char *argv[])
 
         printf("app_entry:%08x\n", app_entry);
         syssym_hash = calc_sys_sym_hash();
-        printf("sys hash:%08x\n", syssym_hash);
 
         // dump_str_to_ldscript();
-
+        bool has_text = false, has_data = false;
         for (int i = 0; i < numPH; i++)
         {
             printf("PH:%d:\n", i);
@@ -325,6 +325,7 @@ int main(int argc, const char *argv[])
                 sz_text = sz;
                 text_vbase = vaddr;
                 fo_text = fileOffset;
+                has_text = true;
 
                 memcpy(buf_text_rodata, &buf_appelf[fo_text], sz_text);
                 continue;
@@ -340,9 +341,24 @@ int main(int argc, const char *argv[])
                 sz_data = sz;
                 data_vbase = vaddr;
                 fo_data = fileOffset;
+                has_data = true;
 
                 memcpy(buf_data, &buf_appelf[fo_data], sz_data);
             }
+        }
+
+        if(!has_text)
+        {
+            sz_data = 0;
+            fo_data = 0;
+            data_vbase = 0;
+        }
+
+        if(!has_data)
+        {
+            sz_data = 0;
+            fo_data = 0;
+            data_vbase = 0;
         }
 
         printf("Searching Section.\n");
@@ -623,6 +639,7 @@ int main(int argc, const char *argv[])
                   ((sz_rel_info + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))));
 
         printf("outputSize:%d\n", sz_exp);
+        printf("syssym hash:%08x\n", syssym_hash);
 
         buf_exp = malloc(sz_exp);
         if (!buf_exp)

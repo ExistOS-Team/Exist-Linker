@@ -1,21 +1,21 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <assert.h>
-#include "libelf/elf_user.h"
 #include "libelf/elf32.h"
+#include "libelf/elf_user.h"
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "exp.h"
 
 #define VERBOSE 1
 
 #if VERBOSE
-#define INFO(...)            \
-    do                       \
-    {                        \
-        printf(__VA_ARGS__); \
+#define INFO(...)                                                                                                      \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        printf(__VA_ARGS__);                                                                                           \
     } while (0)
 #else
 #define INFO(...)
@@ -296,8 +296,8 @@ int main(int argc, const char *argv[])
             fprintf(stderr, "Error AppELF Format!\n");
             goto exit2;
         }
-        uint32_t Relocate_vbase, sz_rel, fo_rel;
-        uint32_t text_vbase, sz_text, fo_text;
+        uint32_t Relocate_vbase, sz_rel; // fo_rel;
+        uint32_t text_vbase = 0, sz_text = 0, fo_text;
         uint32_t data_vbase, sz_data, fo_data;
 
         uint32_t app_entry = (uint32_t)elf_getEntryPoint(&elf_app);
@@ -321,7 +321,8 @@ int main(int argc, const char *argv[])
                 vaddr = elf_getProgramHeaderVaddr(&elf_app, i);
                 paddr = elf_getProgramHeaderPaddr(&elf_app, i);
                 sz = elf_getProgramHeaderFileSize(&elf_app, i);
-                printf("(text, rodata) Executable, fileOffset:%08x, vaddr:%08x, paddr:%08x, sz:%d\n", fileOffset, vaddr, paddr, sz);
+                printf("(text, rodata) Executable, fileOffset:%08lx, vaddr:%08x, paddr:%08x, sz:%d\n", fileOffset,
+                       vaddr, paddr, sz);
                 sz_text = sz;
                 text_vbase = vaddr;
                 fo_text = fileOffset;
@@ -337,7 +338,7 @@ int main(int argc, const char *argv[])
                 vaddr = elf_getProgramHeaderVaddr(&elf_app, i);
                 paddr = elf_getProgramHeaderPaddr(&elf_app, i);
                 sz = elf_getProgramHeaderFileSize(&elf_app, i);
-                printf("(data) RW, fileOffset:%08x, vaddr:%08x, paddr:%08x, sz:%d\n", fileOffset, vaddr, paddr, sz);
+                printf("(data) RW, fileOffset:%08lx, vaddr:%08x, paddr:%08x, sz:%d\n", fileOffset, vaddr, paddr, sz);
                 sz_data = sz;
                 data_vbase = vaddr;
                 fo_data = fileOffset;
@@ -347,14 +348,14 @@ int main(int argc, const char *argv[])
             }
         }
 
-        if(!has_text)
+        if (!has_text)
         {
             sz_data = 0;
             fo_data = 0;
             data_vbase = 0;
         }
 
-        if(!has_data)
+        if (!has_data)
         {
             sz_data = 0;
             fo_data = 0;
@@ -369,7 +370,7 @@ int main(int argc, const char *argv[])
 
         const char *sname;
         size_t numSection = elf_getNumSections(&elf_app);
-        printf("numSection:%d\n", numSection);
+        printf("numSection:%ld\n", numSection);
 
         for (int i = 0; i < numSection; i++)
         {
@@ -380,14 +381,14 @@ int main(int argc, const char *argv[])
                     app_sym_table = (Elf32_Sym *)elf_getSectionOffset(&elf_app, i);
                     app_sym_total = elf_getSectionSize(&elf_app, i) / sizeof(Elf32_Sym);
                     printf("app_symtab:%p, item:%d\n", app_sym_table, app_sym_total);
-                    app_sym_table = (Elf32_Sym *)((uint32_t)app_sym_table + (uint32_t)buf_appelf);
+                    app_sym_table = (Elf32_Sym *)((uintptr_t)app_sym_table + (uintptr_t)buf_appelf);
                 }
             if (strlen(sname) >= sizeof(".strtab") - 1)
                 if (strcmp(sname, ".strtab") == 0)
                 {
                     app_sym_str = (char *)elf_getSectionOffset(&elf_app, i);
                     printf("app_symstr:%p\n", app_sym_str);
-                    app_sym_str += (uint32_t)buf_appelf;
+                    app_sym_str += (uintptr_t)buf_appelf;
                 }
         }
 
@@ -411,7 +412,7 @@ int main(int argc, const char *argv[])
                     rel_base = (Elf32_Rel *)elf_getSectionOffset(&elf_app, i);
                     rel_num = elf_getSectionSize(&elf_app, i) / sizeof(Elf32_Rel);
                     printf("rel_tab:%s, addr:%p, num:%d\n", sname, rel_base, rel_num);
-                    rel_base = (Elf32_Rel *)((uint32_t)rel_base + (uint32_t)buf_appelf);
+                    rel_base = (Elf32_Rel *)((uintptr_t)rel_base + (uintptr_t)buf_appelf);
 
                     Elf32_Sym *sym;
                     uint32_t *fill_addr;
@@ -424,19 +425,20 @@ int main(int argc, const char *argv[])
                         sym += rel_base[j].r_info >> 8;
                         switch (rel_base[j].r_info & 0xFF)
                         {
-                        case R_ARM_ABS32:
-                        {
+                        case R_ARM_ABS32: {
                             if (sym->st_value == 0)
                             {
                                 INFO("ABS32, at:%08x, cur:%08x, ", rel_base[j].r_offset, sym->st_value);
-                                if ((rel_base[j].r_offset >= data_vbase) && (rel_base[j].r_offset < data_vbase + sz_data))
+                                if ((rel_base[j].r_offset >= data_vbase) &&
+                                    (rel_base[j].r_offset < data_vbase + sz_data))
                                 {
                                     fill_addr_sec = 'd';
                                     fill_addr_fo = rel_base[j].r_offset - data_vbase;
                                     fill_addr = ((uint32_t *)(&buf_data[rel_base[j].r_offset - data_vbase]));
                                     INFO("content(in DATA): %08x ", *fill_addr);
                                 }
-                                else if ((rel_base[j].r_offset >= text_vbase) && (rel_base[j].r_offset < text_vbase + sz_text))
+                                else if ((rel_base[j].r_offset >= text_vbase) &&
+                                         (rel_base[j].r_offset < text_vbase + sz_text))
                                 {
                                     fill_addr_sec = 't';
                                     fill_addr_fo = rel_base[j].r_offset - text_vbase;
@@ -454,8 +456,9 @@ int main(int argc, const char *argv[])
                                 INFO("Relocate to:%08x ", reladr);
                                 INFO("sym :%s\n", &app_sym_str[sym->st_name]);
 
-                                sprintf(strbuf, "%08x %c %s\n", fill_addr_fo, fill_addr_sec, &app_sym_str[sym->st_name]);
-                                strcpy(&buf_rel_info[ptr_rinfo], strbuf);
+                                sprintf(strbuf, "%08x %c %s\n", fill_addr_fo, fill_addr_sec,
+                                        &app_sym_str[sym->st_name]);
+                                strcpy((char *)&buf_rel_info[ptr_rinfo], strbuf);
                                 ptr_rinfo += strlen(strbuf);
                                 sz_rel_info = ptr_rinfo;
 
@@ -468,22 +471,30 @@ int main(int argc, const char *argv[])
 
                                 *fill_addr = reladr;
                             }
-                            // printf("ABS32: %s, %d,at:%08x val:%08x\n",  &app_sym_str[sym->st_name], sym->st_info, rel_base[j].r_offset ,sym->st_value  );
+                            // printf("ABS32: %s, %d,at:%08x val:%08x\n",  &app_sym_str[sym->st_name], sym->st_info,
+                            // rel_base[j].r_offset ,sym->st_value  );
                         }
                         break;
-                        case R_ARM_CALL:
-                        {
+                        case R_ARM_CALL: {
                             if (sym->st_value == 0)
                             {
-                                INFO("CALL , at:%08x, link_to_addr:%08x, ", rel_base[j].r_offset, sym->st_value);
-                                if ((rel_base[j].r_offset >= data_vbase) && (rel_base[j].r_offset < data_vbase + sz_data))
+                                INFO("CALL, at:%08x, link_to_addr:%08x, ", rel_base[j].r_offset, sym->st_value);
+                                char fill_addr_sec;
+                                uint32_t fill_addr_fo;
+                                if ((rel_base[j].r_offset >= data_vbase) &&
+                                    (rel_base[j].r_offset < data_vbase + sz_data))
                                 {
-                                    fill_addr = ((uint32_t *)(&buf_data[rel_base[j].r_offset - data_vbase]));
+                                    fill_addr_sec = 'd';
+                                    fill_addr_fo = rel_base[j].r_offset - data_vbase;
+                                    fill_addr = (uint32_t *)(&buf_data[fill_addr_fo]);
                                     INFO("content(in DATA): %08x ", *fill_addr);
                                 }
-                                else if ((rel_base[j].r_offset >= text_vbase) && (rel_base[j].r_offset < text_vbase + sz_text))
+                                else if ((rel_base[j].r_offset >= text_vbase) &&
+                                         (rel_base[j].r_offset < text_vbase + sz_text))
                                 {
-                                    fill_addr = ((uint32_t *)(&buf_text_rodata[rel_base[j].r_offset - text_vbase]));
+                                    fill_addr_sec = 't';
+                                    fill_addr_fo = rel_base[j].r_offset - text_vbase;
+                                    fill_addr = (uint32_t *)(&buf_text_rodata[fill_addr_fo]);
                                     INFO("content(in TEXT): %08x ", *fill_addr);
                                 }
                                 else
@@ -493,24 +504,49 @@ int main(int argc, const char *argv[])
                                     goto exit2;
                                 }
 
+                                uint32_t reladr = search_sys_sym((char *)&app_sym_str[sym->st_name]);
+                                INFO("Relocate to:%08x ", reladr);
                                 INFO("sym :%s\n", &app_sym_str[sym->st_name]);
-                                printf("Unsupported Type: R_ARM_CALL\n");
-                                exit(-1);
+
+                                if (!reladr)
+                                {
+                                    fprintf(stderr, "ERROR 3: Unresolved Symbol:%s\n", &app_sym_str[sym->st_name]);
+                                    ret = -1;
+                                    goto exit2;
+                                }
+
+                                uint32_t pc = rel_base[j].r_offset + 8;
+                                int32_t offset = (reladr - pc) >> 2;
+                                if (offset > 0x007FFFFF || offset < (int32_t)0xFF800000)
+                                {
+                                    fprintf(stderr, "ERROR: R_ARM_CALL relocation out of range for symbol %s\n",
+                                            &app_sym_str[sym->st_name]);
+                                    ret = -1;
+                                    goto exit2;
+                                }
+
+                                *fill_addr = (*fill_addr & 0xFF000000) | (offset & 0x00FFFFFF);
+
+                                sprintf(strbuf, "%08x %c %s\n", fill_addr_fo, fill_addr_sec,
+                                        &app_sym_str[sym->st_name]);
+                                strcpy((char*)&buf_rel_info[ptr_rinfo], strbuf);
+                                ptr_rinfo += strlen(strbuf);
+                                sz_rel_info = ptr_rinfo;
                             }
-                            // printf("CALL: %s, %d,at:%08x val:%08x\n", &app_sym_str[sym->st_name], sym->st_info, rel_base[j].r_offset, sym->st_value);
                         }
                         break;
-                        case R_ARM_JUMP24:
-                        {
+                        case R_ARM_JUMP24: {
                             if (sym->st_value == 0)
                             {
                                 INFO("JMP24, at:%08x, link_to_addr:%08x, ", rel_base[j].r_offset, sym->st_value);
-                                if ((rel_base[j].r_offset >= data_vbase) && (rel_base[j].r_offset < data_vbase + sz_data))
+                                if ((rel_base[j].r_offset >= data_vbase) &&
+                                    (rel_base[j].r_offset < data_vbase + sz_data))
                                 {
                                     fill_addr = ((uint32_t *)(&buf_data[rel_base[j].r_offset - data_vbase]));
                                     INFO("content(in DATA): %08x ", *fill_addr);
                                 }
-                                else if ((rel_base[j].r_offset >= text_vbase) && (rel_base[j].r_offset < text_vbase + sz_text))
+                                else if ((rel_base[j].r_offset >= text_vbase) &&
+                                         (rel_base[j].r_offset < text_vbase + sz_text))
                                 {
                                     fill_addr = ((uint32_t *)(&buf_text_rodata[rel_base[j].r_offset - text_vbase]));
                                     INFO("content(in TEXT): %08x ", *fill_addr);
@@ -528,17 +564,18 @@ int main(int argc, const char *argv[])
                             }
                         }
                         break;
-                        case R_ARM_THM_PC22:
-                        {
+                        case R_ARM_THM_PC22: {
                             if (sym->st_value == 0)
                             {
                                 INFO("JMP24, at:%08x, link_to_addr:%08x, ", rel_base[j].r_offset, sym->st_value);
-                                if ((rel_base[j].r_offset >= data_vbase) && (rel_base[j].r_offset < data_vbase + sz_data))
+                                if ((rel_base[j].r_offset >= data_vbase) &&
+                                    (rel_base[j].r_offset < data_vbase + sz_data))
                                 {
                                     fill_addr = ((uint32_t *)(&buf_data[rel_base[j].r_offset - data_vbase]));
                                     INFO("content(in DATA): %08x ", *fill_addr);
                                 }
-                                else if ((rel_base[j].r_offset >= text_vbase) && (rel_base[j].r_offset < text_vbase + sz_text))
+                                else if ((rel_base[j].r_offset >= text_vbase) &&
+                                         (rel_base[j].r_offset < text_vbase + sz_text))
                                 {
                                     fill_addr = ((uint32_t *)(&buf_text_rodata[rel_base[j].r_offset - text_vbase]));
                                     INFO("content(in TEXT): %08x ", *fill_addr);
@@ -555,17 +592,18 @@ int main(int argc, const char *argv[])
                                 exit(-1);
                             }
                         }
-                        case R_ARM_V4BX:
-                        {
+                        case R_ARM_V4BX: {
                             if (sym->st_value == 0)
                             {
                                 INFO("V4BX , at:%08x, link_to_addr:%08x, ", rel_base[j].r_offset, sym->st_value);
-                                if ((rel_base[j].r_offset >= data_vbase) && (rel_base[j].r_offset < data_vbase + sz_data))
+                                if ((rel_base[j].r_offset >= data_vbase) &&
+                                    (rel_base[j].r_offset < data_vbase + sz_data))
                                 {
                                     fill_addr = ((uint32_t *)(&buf_data[rel_base[j].r_offset - data_vbase]));
                                     INFO("content(in DATA): %08x ", *fill_addr);
                                 }
-                                else if ((rel_base[j].r_offset >= text_vbase) && (rel_base[j].r_offset < text_vbase + sz_text))
+                                else if ((rel_base[j].r_offset >= text_vbase) &&
+                                         (rel_base[j].r_offset < text_vbase + sz_text))
                                 {
                                     fill_addr = ((uint32_t *)(&buf_text_rodata[rel_base[j].r_offset - text_vbase]));
                                     INFO("content(in TEXT): %08x ", *fill_addr);
@@ -579,22 +617,23 @@ int main(int argc, const char *argv[])
                                 *fill_addr &= 0xf000000f;
                                 *fill_addr |= 0x01a0f000;
                                 INFO(" -> mov pc,r%d\n", *fill_addr & 0xF);
-                                printf("Unsupported Type: R_ARM_V4BX\n");
-                                exit(-1);
+                                // printf("Unsupported Type: R_ARM_V4BX\n");
+                                // exit(-1);
                             }
                         }
                         break;
-                        case R_ARM_PREL31:
-                        {
+                        case R_ARM_PREL31: {
                             if (sym->st_value == 0)
                             {
                                 INFO("PREL31, at:%08x, link_to_addr:%08x, ", rel_base[j].r_offset, sym->st_value);
-                                if ((rel_base[j].r_offset >= data_vbase) && (rel_base[j].r_offset < data_vbase + sz_data))
+                                if ((rel_base[j].r_offset >= data_vbase) &&
+                                    (rel_base[j].r_offset < data_vbase + sz_data))
                                 {
                                     fill_addr = ((uint32_t *)(&buf_data[rel_base[j].r_offset - data_vbase]));
                                     INFO("content(in DATA): %08x ", *fill_addr);
                                 }
-                                else if ((rel_base[j].r_offset >= text_vbase) && (rel_base[j].r_offset < text_vbase + sz_text))
+                                else if ((rel_base[j].r_offset >= text_vbase) &&
+                                         (rel_base[j].r_offset < text_vbase + sz_text))
                                 {
                                     fill_addr = ((uint32_t *)(&buf_text_rodata[rel_base[j].r_offset - text_vbase]));
                                     INFO("content(in TEXT): %08x ", *fill_addr);
@@ -618,8 +657,7 @@ int main(int argc, const char *argv[])
                         break;
                         case R_ARM_NONE:
                             break;
-                        default:
-                        {
+                        default: {
                             printf("Unknown Type:%08x\n", rel_base[j].r_info);
                             exit(-1);
                         }
@@ -632,13 +670,13 @@ int main(int argc, const char *argv[])
         sz_rel = 0;
         Relocate_vbase = 0;
 
-        sz_exp = (((sizeof(exp_header_t) + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))) +
-                  ((sz_text + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))) +
-                  ((sz_data + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))) +
-                  ((sz_rel + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))) +
-                  ((sz_rel_info + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))));
+        sz_exp =
+            (((sizeof(exp_header_t) + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))) +
+             ((sz_text + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))) + ((sz_data + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))) +
+             ((sz_rel + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))) +
+             ((sz_rel_info + (PAGE_SIZE - 1)) & (~(PAGE_SIZE - 1))));
 
-        printf("outputSize:%d\n", sz_exp);
+        printf("outputSize:%ld\n", sz_exp);
         printf("syssym hash:%08x\n", syssym_hash);
 
         buf_exp = malloc(sz_exp);
@@ -741,9 +779,9 @@ int main(int argc, const char *argv[])
         fr = fscanf(f_exp, "%08x %c %s\n", &rec_fill_adr, &fill_sec, symn);
         while (fr == 3)
         {
-            
+
             savep = ftell(f_exp);
-            //printf("%08x, %c, %s, %08x\n",rec_fill_adr, fill_sec, symn, savep );
+            // printf("%08x, %c, %s, %08x\n",rec_fill_adr, fill_sec, symn, savep );
             symadr = search_sys_sym(symn);
             if (!symadr)
             {
@@ -751,16 +789,16 @@ int main(int argc, const char *argv[])
                 ret = -1;
                 goto exit02;
             }
-            
+
             switch (fill_sec)
             {
             case 'd': // data
-                printf("Relocate, at:%08x, to:%08x, sym:%s\n", rec_fill_adr + expHeader.data_fo, symadr,   symn   );
+                printf("Relocate, at:%08x, to:%08x, sym:%s\n", rec_fill_adr + expHeader.data_fo, symadr, symn);
                 fseek(f_exp, rec_fill_adr + expHeader.data_fo, SEEK_SET);
                 fwrite(&symadr, 1, 4, f_exp);
                 break;
             case 't': // text
-                printf("Relocate, at:%08x, to:%08x, sym:%s\n", rec_fill_adr + expHeader.text_fo, symadr,   symn   );
+                printf("Relocate, at:%08x, to:%08x, sym:%s\n", rec_fill_adr + expHeader.text_fo, symadr, symn);
                 fseek(f_exp, rec_fill_adr + expHeader.text_fo, SEEK_SET);
                 fwrite(&symadr, 1, 4, f_exp);
                 break;
@@ -768,17 +806,15 @@ int main(int argc, const char *argv[])
                 break;
             }
 
-            //printf("savep:%ld\n",savep);
+            // printf("savep:%ld\n",savep);
             fseek(f_exp, savep, SEEK_SET);
             fr = fscanf(f_exp, "%08x %c %s\n", &rec_fill_adr, &fill_sec, symn);
-            
         }
         printf("Relocate done.\n");
 
         fseek(f_exp, 0, SEEK_SET);
         fwrite(&expHeader, 1, sizeof(exp_header_t), f_exp);
         fclose(f_exp);
-
     }
 exit2:
     free(buf_appelf);
@@ -788,17 +824,17 @@ exit1:
     fclose(f_appelf);
     fclose(f_exp);
 
-exit0:
+    // exit0:
     return ret;
 
 exit02:
     free(buf_exp);
 
-exit01:
+    // exit01:
     fclose(f_symtab);
     fclose(f_exp);
 
-exit00:
+    // exit00:
     return ret;
 }
 void Usage()
